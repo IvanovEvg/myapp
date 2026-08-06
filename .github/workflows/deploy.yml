@@ -4,75 +4,43 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+
 env:
   DOCKER_IMAGE: java123333/myapp:latest
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
+      
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ env.DOCKER_IMAGE }}
-
+      
       - name: Deploy to server via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            echo "🚀 Starting deployment..."
-            cd /opt/myapp
-
-            echo "📦 Pulling new image..."
-            docker pull ${{ env.DOCKER_IMAGE }}
-
-            echo "🔄 Restarting containers..."
-            docker compose down || true
-            docker compose up -d
-
-            echo "✅ Deployment completed!"
-            docker ps      - name: Deploy to server via SSH
         env:
-          # Передаем наш base64 ключ в переменную окружения
           ENCODED_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          # 1. Создаем папку для ключа на роботе GitHub
           mkdir -p ~/.ssh
-          
-          # 2. Расшифровываем base64 строку обратно в нормальный ключ
           echo "$ENCODED_KEY" | base64 -d > ~/.ssh/deploy_key
-          
-          # 3. Ставим строгие права (иначе Linux запретит использовать ключ)
           chmod 600 ~/.ssh/deploy_key
-          
-          # 4. Подключаемся к серверу и выполняем команды
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
-            echo '🚀 Начинаем деплой...'
-            cd /opt/myapp
-            
-            echo '📦 Скачиваем новый образ...'
-            docker pull ${{ env.DOCKER_IMAGE }}
-            
-            echo '🔄 Перезапускаем контейнеры...'
-            docker compose down || true
-            docker compose up -d
- 
-            echo '✅ Деплой успешно завершён!'
+            cd /opt/myapp &&
+            docker pull ${{ env.DOCKER_IMAGE }} &&
+            docker compose down || true &&
+            docker compose up -d &&
+            echo 'Deployment completed!' &&
             docker ps
           "
