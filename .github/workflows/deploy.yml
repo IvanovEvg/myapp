@@ -47,4 +47,32 @@ jobs:
             docker compose up -d
 
             echo "✅ Deployment completed!"
+            docker ps      - name: Deploy to server via SSH
+        env:
+          # Передаем наш base64 ключ в переменную окружения
+          ENCODED_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          # 1. Создаем папку для ключа на роботе GitHub
+          mkdir -p ~/.ssh
+          
+          # 2. Расшифровываем base64 строку обратно в нормальный ключ
+          echo "$ENCODED_KEY" | base64 -d > ~/.ssh/deploy_key
+          
+          # 3. Ставим строгие права (иначе Linux запретит использовать ключ)
+          chmod 600 ~/.ssh/deploy_key
+          
+          # 4. Подключаемся к серверу и выполняем команды
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_IP }} "
+            echo '🚀 Начинаем деплой...'
+            cd /opt/myapp
+            
+            echo '📦 Скачиваем новый образ...'
+            docker pull ${{ env.DOCKER_IMAGE }}
+            
+            echo '🔄 Перезапускаем контейнеры...'
+            docker compose down || true
+            docker compose up -d
+ 
+            echo '✅ Деплой успешно завершён!'
             docker ps
+          "
